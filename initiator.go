@@ -19,11 +19,9 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
-	"strings"
+	"fmt"
 	"sync"
 	"time"
-
-	"golang.org/x/net/proxy"
 )
 
 // Initiator initiates connections and processes messages for all sessions.
@@ -46,15 +44,20 @@ func (i *Initiator) Start() (err error) {
 
 	for sessionID, settings := range i.sessionSettings {
 		// TODO: move into session factory.
+		fmt.Println("loading tls config")
+
 		var tlsConfig *tls.Config
 		if tlsConfig, err = loadTLSConfig(settings); err != nil {
-			return
+			return err
 		}
 
-		var dialer proxy.ContextDialer
+		fmt.Println("loading dialer config")
+		var dialer Dialer
 		if dialer, err = loadDialerConfig(settings); err != nil {
-			return
+			return err
 		}
+
+		fmt.Println("handle connections")
 
 		i.wg.Add(1)
 		go func(sessID SessionID) {
@@ -143,7 +146,7 @@ func (i *Initiator) waitForReconnectInterval(reconnectInterval time.Duration) bo
 	return true
 }
 
-func (i *Initiator) handleConnection(session *session, tlsConfig *tls.Config, dialer proxy.ContextDialer) {
+func (i *Initiator) handleConnection(session *session, tlsConfig *tls.Config, dialer Dialer) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -180,29 +183,13 @@ func (i *Initiator) handleConnection(session *session, tlsConfig *tls.Config, di
 		var msgIn chan fixIn
 		var msgOut chan []byte
 
-		address := session.SocketConnectAddress[connectionAttempt%len(session.SocketConnectAddress)]
-		session.log.OnEventf("Connecting to: %v", address)
-
-		netConn, err := dialer.DialContext(ctx, "tcp", address)
+		netConn, err := dialer.Dial(ctx, session, connectionAttempt, tlsConfig)
 		if err != nil {
 			session.log.OnEventf("Failed to connect: %v", err)
 			goto reconnect
-		} else if tlsConfig != nil {
-			// Unless InsecureSkipVerify is true, server name config is required for TLS
-			// to verify the received certificate
-			if !tlsConfig.InsecureSkipVerify && len(tlsConfig.ServerName) == 0 {
-				serverName := address
-				if c := strings.LastIndex(serverName, ":"); c > 0 {
-					serverName = serverName[:c]
-				}
-				tlsConfig.ServerName = serverName
-			}
-			tlsConn := tls.Client(netConn, tlsConfig)
-			if err = tlsConn.Handshake(); err != nil {
-				session.log.OnEventf("Failed handshake: %v", err)
-				goto reconnect
-			}
-			netConn = tlsConn
+		} else {
+			address := netConn.RemoteAddr().String()
+			session.log.OnEventf("connected to remote address: %v", address)
 		}
 
 		msgIn = make(chan fixIn)

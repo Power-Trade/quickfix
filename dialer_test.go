@@ -42,7 +42,7 @@ func (s *DialerTestSuite) TestLoadDialerNoSettings() {
 	dialer, err := loadDialerConfig(s.settings.GlobalSettings())
 	s.Require().Nil(err)
 
-	stdDialer, ok := dialer.(*net.Dialer)
+	stdDialer, ok := dialer.(*TcpDialer).ctxDialer.(*net.Dialer)
 	s.Require().True(ok)
 	s.Require().NotNil(stdDialer)
 	s.Zero(stdDialer.Timeout)
@@ -53,7 +53,7 @@ func (s *DialerTestSuite) TestLoadDialerWithTimeout() {
 	dialer, err := loadDialerConfig(s.settings.GlobalSettings())
 	s.Require().Nil(err)
 
-	stdDialer, ok := dialer.(*net.Dialer)
+	stdDialer, ok := dialer.(*TcpDialer).ctxDialer.(*net.Dialer)
 	s.Require().True(ok)
 	s.Require().NotNil(stdDialer)
 	s.EqualValues(10*time.Second, stdDialer.Timeout)
@@ -73,7 +73,7 @@ func (s *DialerTestSuite) TestLoadDialerSocksProxy() {
 	s.Require().Nil(err)
 	s.Require().NotNil(dialer)
 
-	_, ok := dialer.(*net.Dialer)
+	_, ok := dialer.(*TcpDialer).ctxDialer.(*net.Dialer)
 	s.Require().False(ok)
 }
 

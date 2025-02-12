@@ -16,23 +16,107 @@
 package quickfix
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"golang.org/x/net/proxy"
+	"golang.org/x/net/websocket"
 
 	"github.com/quickfixgo/quickfix/config"
 )
 
-func loadDialerConfig(settings *SessionSettings) (dialer proxy.ContextDialer, err error) {
+type Dialer interface {
+	Dial(ctx context.Context, session *session, attempt int, tlsConfig *tls.Config) (net.Conn, error)
+}
+
+type TcpDialer struct {
+	ctxDialer proxy.ContextDialer
+}
+
+func (d *TcpDialer) Dial(ctx context.Context, session *session, attempt int, tlsConfig *tls.Config) (conn net.Conn, err error) {
+	address := session.SocketConnectAddress[attempt%len(session.SocketConnectAddress)]
+	session.log.OnEventf("Connecting to: %v", address)
+
+	conn, err = d.ctxDialer.DialContext(ctx, "tcp", address)
+
+	if err != nil {
+		return
+	} else if tlsConfig != nil {
+		// Unless InsecureSkipVerify is true, server name config is required for TLS
+		// to verify the received certificate
+		if !tlsConfig.InsecureSkipVerify && len(tlsConfig.ServerName) == 0 {
+			serverName := address
+			if c := strings.LastIndex(serverName, ":"); c > 0 {
+				serverName = serverName[:c]
+			}
+			tlsConfig.ServerName = serverName
+		}
+		tlsConn := tls.Client(conn, tlsConfig)
+		if err = tlsConn.Handshake(); err != nil {
+
+			session.log.OnEventf("Failed handshake: %v", err)
+			return
+		}
+		conn = tlsConn
+	}
+
+	return
+}
+
+type WebsocketDialer struct {
+	wsConfig *websocket.Config
+}
+
+func (d *WebsocketDialer) Dial(ctx context.Context, session *session, attempt int, tlsConfig *tls.Config) (conn net.Conn, err error) {
+	session.log.OnEventf("Connecting to: %v", d.wsConfig.Location)
+
+	d.wsConfig.TlsConfig = tlsConfig
+	conn, err = d.wsConfig.DialContext(ctx)
+	return
+}
+
+func loadDialerConfig(settings *SessionSettings) (dialer Dialer, err error) {
+
+	if settings.HasSetting(config.WebsocketLocation) {
+		fmt.Printf("loading websocket config")
+		var location string
+		location, err = settings.Setting(config.WebsocketLocation)
+		if err != nil {
+			return nil, err
+		}
+
+		var origin string
+		origin, err = settings.Setting(config.WebsocketOrigin)
+		if err != nil {
+			return nil, err
+		}
+
+		var wsConfig *websocket.Config
+		wsConfig, err = websocket.NewConfig(location, origin)
+		if err != nil {
+			return nil, err
+		}
+
+		dialer = &WebsocketDialer{
+			wsConfig: wsConfig,
+		}
+		return
+	}
+
 	stdDialer := &net.Dialer{}
+	dialer = &TcpDialer{
+		ctxDialer: stdDialer,
+	}
 	if settings.HasSetting(config.SocketTimeout) {
 		timeout, err := settings.DurationSetting(config.SocketTimeout)
 		if err != nil {
 			timeoutInt, err := settings.IntSetting(config.SocketTimeout)
 			if err != nil {
-				return stdDialer, err
+				return nil, err
 			}
 
 			stdDialer.Timeout = time.Duration(timeoutInt) * time.Second
@@ -40,7 +124,6 @@ func loadDialerConfig(settings *SessionSettings) (dialer proxy.ContextDialer, er
 			stdDialer.Timeout = timeout
 		}
 	}
-	dialer = stdDialer
 
 	if !settings.HasSetting(config.ProxyType) {
 		return
@@ -81,7 +164,9 @@ func loadDialerConfig(settings *SessionSettings) (dialer proxy.ContextDialer, er
 		}
 
 		if contextDialer, ok := proxyDialer.(proxy.ContextDialer); ok {
-			dialer = contextDialer
+			dialer = &TcpDialer{
+				ctxDialer: contextDialer,
+			}
 		} else {
 			err = fmt.Errorf("proxy does not support context dialer")
 			return

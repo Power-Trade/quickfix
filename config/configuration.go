@@ -613,6 +613,27 @@ const (
 	// Valid Values:
 	//  - Any string
 	ProxyPassword string = "ProxyPassword"
+
+	// WebsocketLocation sets the websocket endpoint to attempt to connect to.
+	// Setting this would override any SocketConnectHost and SocketConnectPort settings and connect using websocket
+	//
+	// Required: No
+	//
+	// Default: N/A
+	//
+	// Valid Values:
+	//  - A websocket endpoint - eg. wss://example.com/ws
+	WebsocketLocation string = "WebsocketLocation"
+
+	// WebsocketOrigin sets the websocket origin to attempt to connect from.
+	//
+	// Required: No
+	//
+	// Default: N/A
+	//
+	// Valid Values:
+	//  - url - eg. http://localhost/
+	WebsocketOrigin string = "WebsocketOrigin"
 )
 
 const (
@@ -832,6 +853,8 @@ const (
 	//  - Y
 	//  - N
 	SocketUseSSL string = "SocketUseSSL"
+
+	WebsocketUseSSL string = "WebsocketUseSSL"
 )
 
 const (
