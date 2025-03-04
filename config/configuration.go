@@ -523,7 +523,7 @@ const (
 	// This allows for alternate socket hosts for connecting to a session for failover.
 	// (i.e.) SocketConnectHost1, SocketConnectHost2... must be consecutive and have a matching SocketConnectPort<n>.
 	//
-	// Required: Yes for initiators
+	// Required: Yes for initiators on socket connections
 	//
 	// Default: None
 	//
@@ -536,7 +536,7 @@ const (
 	// This allows for alternate socket ports for connecting to a session for failover.
 	// (i.e.) SocketConnectPort1, SocketConnectPort2... must be consecutive and have a matching SocketConnectHost<n>.
 	//
-	// Required: Yes for initiators
+	// Required: Yes for initiators on socket connections
 	//
 	// Default: None
 	//
@@ -853,8 +853,6 @@ const (
 	//  - Y
 	//  - N
 	SocketUseSSL string = "SocketUseSSL"
-
-	WebsocketUseSSL string = "WebsocketUseSSL"
 )
 
 const (

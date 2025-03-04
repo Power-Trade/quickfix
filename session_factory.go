@@ -475,6 +475,13 @@ func (f sessionFactory) buildInitiatorSettings(session *session, settings *Sessi
 func (f sessionFactory) configureSocketConnectAddress(session *session, settings *SessionSettings) (err error) {
 	session.SocketConnectAddress = []string{}
 
+	if !settings.HasSetting(config.SocketConnectHost) {
+		if !settings.HasSetting(config.WebsocketLocation) {
+			err = errors.New("SocketConnectHost must be specified if WebsocketLocation is not specified")
+		}
+		return
+	}
+
 	var socketConnectHost, socketConnectPort string
 	for i := 0; ; {
 

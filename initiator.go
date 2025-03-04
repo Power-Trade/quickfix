@@ -19,7 +19,6 @@ import (
 	"bufio"
 	"context"
 	"crypto/tls"
-	"fmt"
 	"sync"
 	"time"
 )
@@ -44,20 +43,15 @@ func (i *Initiator) Start() (err error) {
 
 	for sessionID, settings := range i.sessionSettings {
 		// TODO: move into session factory.
-		fmt.Println("loading tls config")
-
 		var tlsConfig *tls.Config
 		if tlsConfig, err = loadTLSConfig(settings); err != nil {
 			return err
 		}
 
-		fmt.Println("loading dialer config")
 		var dialer Dialer
 		if dialer, err = loadDialerConfig(settings); err != nil {
 			return err
 		}
-
-		fmt.Println("handle connections")
 
 		i.wg.Add(1)
 		go func(sessID SessionID) {

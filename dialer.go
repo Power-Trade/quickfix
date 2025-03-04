@@ -71,7 +71,7 @@ type WebsocketDialer struct {
 	wsConfig *websocket.Config
 }
 
-func (d *WebsocketDialer) Dial(ctx context.Context, session *session, attempt int, tlsConfig *tls.Config) (conn net.Conn, err error) {
+func (d *WebsocketDialer) Dial(ctx context.Context, session *session, _ int, tlsConfig *tls.Config) (conn net.Conn, err error) {
 	session.log.OnEventf("Connecting to: %v", d.wsConfig.Location)
 
 	d.wsConfig.TlsConfig = tlsConfig
@@ -82,7 +82,6 @@ func (d *WebsocketDialer) Dial(ctx context.Context, session *session, attempt in
 func loadDialerConfig(settings *SessionSettings) (dialer Dialer, err error) {
 
 	if settings.HasSetting(config.WebsocketLocation) {
-		fmt.Printf("loading websocket config")
 		var location string
 		location, err = settings.Setting(config.WebsocketLocation)
 		if err != nil {
